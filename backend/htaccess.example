@@ -1,0 +1,52 @@
+# =============================================================================
+# Pingol Ramos DCMS — backend/.htaccess  (rename to .htaccess on the server)
+# =============================================================================
+
+# ---- Environment variables (override the config.php dev defaults) -----------
+# SetEnv DB_HOST     localhost
+# SetEnv DB_NAME     your_db_name
+# SetEnv DB_USER     your_db_user
+# SetEnv DB_PASS     your_db_password
+# SetEnv JWT_SECRET  replace_with_a_long_random_string
+# SetEnv CORS_ORIGINS https://your-frontend-domain.com
+# SetEnv APP_URL     https://your-api-domain.com/backend
+
+# ---- Pass the Authorization header to PHP (needed for JWT) ------------------
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTP:Authorization} ^(.*)$
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+</IfModule>
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+
+# ---- Protect sensitive files ------------------------------------------------
+<FilesMatch "^(config|db|jwt|bootstrap)\.php$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Block direct access to setup.php after first run (delete the file too!)
+<Files "setup.php">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+</Files>
+
+# Deny access to SQL / config dumps if any are present
+<FilesMatch "\.(sql|env|ini|log)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+</FilesMatch>
+
+# ---- Basic security headers -------------------------------------------------
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>

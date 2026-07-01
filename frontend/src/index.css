@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+    margin: 0;
+  }
+
+  /* Consistent, quiet focus ring for keyboard users */
+  :focus-visible {
+    outline: 2px solid theme('colors.navy.500');
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-display;
+  }
+
+  /* Tabular numbers keep stat cards and tables aligned */
+  .nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+}
+
+@layer components {
+  .input-base {
+    @apply w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink
+           placeholder:text-muted/70 transition
+           focus:border-navy-500 focus:ring-2 focus:ring-navy-500/15 focus:outline-none
+           disabled:cursor-not-allowed disabled:bg-canvas;
+  }
+
+  .card-base {
+    @apply rounded-2xl border border-line bg-surface shadow-card;
+  }
+
+  /* Thin, unobtrusive scrollbars */
+  .scroll-slim::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scroll-slim::-webkit-scrollbar-thumb {
+    background: theme('colors.line'); border-radius: 999px;
+  }
+  .scroll-slim::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Print: hide chrome, show only the printable region */
+@media print {
+  body { background: #fff; }
+  .no-print { display: none !important; }
+  .print-area { box-shadow: none !important; border: none !important; }
+  @page { margin: 16mm; }
+}
