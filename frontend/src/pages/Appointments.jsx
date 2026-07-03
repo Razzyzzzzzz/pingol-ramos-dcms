@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Plus, Search, Filter, CalendarCheck, Printer, Pencil, Trash2, X, CheckCircle2, XCircle,
+  Plus, Search, Filter, CalendarCheck, Printer, Pencil, Trash2, X, CheckCircle2, XCircle, Wallet,
 } from 'lucide-react';
-import { appointmentsApi, lookupsApi, patientsApi } from '../services/endpoints';
+import { appointmentsApi, lookupsApi, patientsApi, paymentsApi } from '../services/endpoints';
 import { getMessage } from '../lib/api';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import {
   Button, IconButton, Card, Badge, Field, Input, Select, Textarea, Loading,
   EmptyState, Pagination, PageHeader,
@@ -14,9 +15,11 @@ import { Modal, ConfirmDialog } from '../components/ui/Modal.jsx';
 import { formatDate, formatTime, STATUS_TONES, titleCase, money } from '../lib/format';
 
 const STATUSES = ['pending', 'approved', 'completed', 'cancelled'];
+const PAYMENT_METHODS = ['cash', 'card', 'gcash', 'bank_transfer', 'other'];
 
 export default function Appointments() {
   const toast = useToast();
+  const { isAdmin } = useAuth();
   const [params, setParams] = useSearchParams();
 
   const [items, setItems] = useState([]);
@@ -35,6 +38,7 @@ export default function Appointments() {
   const [editing, setEditing] = useState(null);
   const [toDelete, setToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [paying, setPaying] = useState(null);
 
   // Load dropdown sources once.
   useEffect(() => {
@@ -49,8 +53,8 @@ export default function Appointments() {
     })();
   }, [toast]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const query = { page, limit: 15 };
       if (search) query.search = search;
@@ -61,13 +65,28 @@ export default function Appointments() {
       setItems(res.data.items);
       setMeta({ page: res.data.page, pages: res.data.pages, total: res.data.total });
     } catch (err) {
-      toast.error(getMessage(err, 'Could not load appointments.'));
+      if (!silent) toast.error(getMessage(err, 'Could not load appointments.'));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [page, search, status, dentistId, date, toast]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Auto-refresh so status changes from other staff (or new patient requests)
+  // show up without a manual reload. Paused while a modal/dialog is open so
+  // it can't clobber in-progress edits. Reads `load` through a ref so the
+  // interval's own lifecycle doesn't depend on `load`'s identity (which
+  // changes whenever the toast context re-renders) — otherwise the timer
+  // gets torn down and restarted before it ever fires.
+  const loadRef = useRef(load);
+  useEffect(() => { loadRef.current = load; }, [load]);
+
+  useEffect(() => {
+    if (modalOpen || toDelete || paying) return;
+    const interval = setInterval(() => loadRef.current(true), 30000);
+    return () => clearInterval(interval);
+  }, [modalOpen, toDelete, paying]);
 
   // Keep URL in sync (shareable filters).
   useEffect(() => {
@@ -171,6 +190,7 @@ export default function Appointments() {
                   <th className="px-5 py-3 font-semibold">Service</th>
                   <th className="px-5 py-3 font-semibold">Schedule</th>
                   <th className="px-5 py-3 font-semibold">Status</th>
+                  <th className="px-5 py-3 font-semibold">Payment</th>
                   <th className="px-5 py-3 text-right font-semibold">Actions</th>
                 </tr>
               </thead>
@@ -192,7 +212,17 @@ export default function Appointments() {
                       <StatusSelect value={a.status} onChange={(s) => changeStatus(a, s)} />
                     </td>
                     <td className="whitespace-nowrap px-5 py-3">
+                      {Number(a.paid_amount) > 0 ? (
+                        <Badge tone="green">Paid {money(a.paid_amount)}</Badge>
+                      ) : (
+                        <Badge tone="amber">Unpaid</Badge>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3">
                       <div className="flex items-center justify-end gap-1">
+                        {isAdmin && (
+                          <IconButton onClick={() => setPaying(a)} aria-label="Record payment"><Wallet size={16} /></IconButton>
+                        )}
                         <IconButton onClick={() => printAppointment(a)} aria-label="Print"><Printer size={16} /></IconButton>
                         <IconButton onClick={() => openEdit(a)} aria-label="Edit"><Pencil size={16} /></IconButton>
                         <IconButton onClick={() => setToDelete(a)} aria-label="Delete" className="text-red-500 hover:bg-red-50"><Trash2 size={16} /></IconButton>
@@ -227,7 +257,84 @@ export default function Appointments() {
         message={toDelete ? `This permanently removes ${toDelete.appointment_code} for ${toDelete.patient}.` : ''}
         confirmLabel="Delete"
       />
+
+      {paying && (
+        <PaymentModal
+          appointment={paying}
+          onClose={() => setPaying(null)}
+          onSaved={() => { setPaying(null); load(); }}
+        />
+      )}
     </div>
+  );
+}
+
+function PaymentModal({ appointment, onClose, onSaved }) {
+  const toast = useToast();
+  const [form, setForm] = useState({
+    amount: appointment.price ?? '',
+    payment_method: 'cash',
+    payment_date: new Date().toISOString().slice(0, 10),
+    description: appointment.service ? `${appointment.service} · ${appointment.appointment_code}` : appointment.appointment_code,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const submit = async () => {
+    setError('');
+    if (!form.amount || Number(form.amount) <= 0) return setError('Amount must be greater than zero.');
+    setSaving(true);
+    try {
+      await paymentsApi.create({
+        patient_id: appointment.patient_id,
+        appointment_id: appointment.id,
+        amount: Number(form.amount),
+        payment_method: form.payment_method,
+        payment_date: form.payment_date,
+        description: form.description || null,
+      });
+      toast.success('Payment recorded.');
+      onSaved();
+    } catch (err) {
+      setError(getMessage(err, 'Could not record payment.'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Record payment"
+      subtitle={`${appointment.appointment_code} · ${appointment.patient}`}
+      size="sm"
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={submit} loading={saving}>Record payment</Button>
+        </>
+      }
+    >
+      <div className="grid gap-4">
+        <Field label="Amount (₱)" required>
+          <Input type="number" min="0" step="0.01" value={form.amount} onChange={(e) => set('amount', e.target.value)} placeholder="0.00" />
+        </Field>
+        <Field label="Method">
+          <Select value={form.payment_method} onChange={(e) => set('payment_method', e.target.value)}>
+            {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{titleCase(m)}</option>)}
+          </Select>
+        </Field>
+        <Field label="Date">
+          <Input type="date" value={form.payment_date} onChange={(e) => set('payment_date', e.target.value)} />
+        </Field>
+        <Field label="Description">
+          <Input value={form.description} onChange={(e) => set('description', e.target.value)} />
+        </Field>
+      </div>
+      {error && <div className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+    </Modal>
   );
 }
 

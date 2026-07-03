@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
 const ToastContext = createContext(null);
@@ -28,11 +28,17 @@ export function ToastProvider({ children }) {
     [dismiss]
   );
 
-  const toast = {
-    success: (m, ttl) => push(m, 'success', ttl),
-    error: (m, ttl) => push(m, 'error', ttl),
-    info: (m, ttl) => push(m, 'info', ttl),
-  };
+  // Memoized so consumers (and anything depending on `toast` in a useCallback
+  // dependency array, e.g. polling effects) don't see a new reference on
+  // every unrelated render.
+  const toast = useMemo(
+    () => ({
+      success: (m, ttl) => push(m, 'success', ttl),
+      error: (m, ttl) => push(m, 'error', ttl),
+      info: (m, ttl) => push(m, 'info', ttl),
+    }),
+    [push]
+  );
 
   return (
     <ToastContext.Provider value={toast}>

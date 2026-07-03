@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
 } from 'react';
 import { authApi } from '../services/endpoints';
 import { tokenStore, setUnauthorizedHandler } from '../lib/api';
@@ -59,16 +60,33 @@ export function AuthProvider({ children }) {
     return u;
   }, []);
 
-  const value = {
-    user,
-    setUser,
-    booting,
-    login,
-    logout,
-    isAuthenticated: !!user,
-    isAdmin: user?.role === 'admin',
-    role: user?.role || null,
-  };
+  const registerPatient = useCallback(async (data) => {
+    const res = await authApi.registerPatient(data);
+    const { token, user: u } = res.data;
+    tokenStore.set(token);
+    localStorage.setItem('prdcms_remember', '1');
+    setUser(u);
+    return u;
+  }, []);
+
+  // Memoized so consumers (and anything depending on auth values in a
+  // useCallback dependency array, e.g. polling effects) don't see a new
+  // reference on every unrelated render.
+  const value = useMemo(
+    () => ({
+      user,
+      setUser,
+      booting,
+      login,
+      registerPatient,
+      logout,
+      isAuthenticated: !!user,
+      isAdmin: user?.role === 'admin',
+      isPatient: user?.role === 'patient',
+      role: user?.role || null,
+    }),
+    [user, booting, login, registerPatient, logout]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

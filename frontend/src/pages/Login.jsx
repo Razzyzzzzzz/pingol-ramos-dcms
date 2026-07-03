@@ -1,45 +1,60 @@
-import { useState } from 'react';
-import { useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { Eye, EyeOff, Lock, Mail, ArrowLeft, LogIn, ShieldCheck } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { useToast } from '../context/ToastContext';
-import { authApi } from '../services/endpoints';
-import { getMessage } from '../lib/api';
-import { Button, Field, Input, Spinner } from '../components/ui/index.jsx';
-import logo from '../assets/logo.png';
+import { useState } from "react";
+import { useNavigate, useLocation, Navigate } from "react-router-dom";
+import {
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  ArrowLeft,
+  LogIn,
+  ShieldCheck,
+} from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import { authApi } from "../services/endpoints";
+import { getMessage } from "../lib/api";
+import { Button, Field, Input, Spinner } from "../components/ui/index.jsx";
+import logo from "../assets/logo.png";
 
 export default function Login() {
-  const { login, isAuthenticated, booting } = useAuth();
+  const { login, isAuthenticated, booting, role } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from?.pathname || '/';
+  const fromLocation = location.state?.from;
+  const staffFrom = fromLocation
+    ? `${fromLocation.pathname || "/dashboard"}${fromLocation.search || ""}${fromLocation.hash || ""}`
+    : "/dashboard";
 
-  const [mode, setMode] = useState('login'); // 'login' | 'forgot'
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState("login"); // 'login' | 'forgot'
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   // Already signed in? Don't show the login screen.
-  if (!booting && isAuthenticated) return <Navigate to={from} replace />;
+  if (!booting && isAuthenticated) {
+    return <Navigate to={role === "patient" ? "/portal" : staffFrom} replace />;
+  }
 
   const submitLogin = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
     if (!email || !password) {
-      setError('Please enter your email and password.');
+      setError("Please enter your email and password.");
       return;
     }
     setBusy(true);
     try {
       const user = await login(email.trim(), password, remember);
-      toast.success(`Welcome back, ${user.name.split(' ')[0]}!`);
-      navigate(from, { replace: true });
+      toast.success(`Welcome back, ${user.name.split(" ")[0]}!`);
+      navigate(user.role === "patient" ? "/portal" : staffFrom, {
+        replace: true,
+      });
     } catch (err) {
-      setError(getMessage(err, 'Unable to sign in.'));
+      setError(getMessage(err, "Unable to sign in."));
     } finally {
       setBusy(false);
     }
@@ -47,20 +62,20 @@ export default function Login() {
 
   const submitForgot = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
     if (!email) {
-      setError('Enter the email tied to your account.');
+      setError("Enter the email tied to your account.");
       return;
     }
     setBusy(true);
     try {
       await authApi.forgotPassword(email.trim());
-      toast.success('If that email exists, a reset link has been generated.');
-      setMode('login');
+      toast.success("If that email exists, a reset link has been generated.");
+      setMode("login");
     } catch (err) {
       // Endpoint is intentionally generic; surface success-style messaging.
-      toast.success('If that email exists, a reset link has been generated.');
-      setMode('login');
+      toast.success("If that email exists, a reset link has been generated.");
+      setMode("login");
       void err;
     } finally {
       setBusy(false);
@@ -77,7 +92,11 @@ export default function Login() {
         <div className="relative flex h-full flex-col justify-between p-12 text-white">
           <div className="flex items-center gap-3">
             <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white p-1.5 shadow-pop">
-              <img src={logo} alt="Pingol Ramos Dental Clinic" className="h-full w-full object-contain" />
+              <img
+                src={logo}
+                alt="Pingol Ramos Dental Clinic"
+                className="h-full w-full object-contain"
+              />
             </span>
             <div className="leading-tight">
               <p className="font-display text-lg font-bold">Pingol Ramos</p>
@@ -87,7 +106,9 @@ export default function Login() {
 
           <div className="max-w-md">
             <h1 className="font-display text-4xl font-bold leading-tight">
-              Clinic management,<br />beautifully organised.
+              Clinic management,
+              <br />
+              beautifully organised.
             </h1>
             <p className="mt-4 text-white/70">
               Appointments, patient records, inventory, and revenue — all in one
@@ -100,7 +121,8 @@ export default function Login() {
           </div>
 
           <p className="text-xs text-white/40">
-            © {new Date().getFullYear()} Pingol Ramos Dental Clinic. All rights reserved.
+            © {new Date().getFullYear()} Pingol Ramos Dental Clinic. All rights
+            reserved.
           </p>
         </div>
       </div>
@@ -111,20 +133,33 @@ export default function Login() {
           {/* Mobile logo */}
           <div className="mb-8 flex flex-col items-center text-center lg:hidden">
             <span className="grid h-16 w-16 place-items-center rounded-2xl bg-white p-2 shadow-card">
-              <img src={logo} alt="Pingol Ramos Dental Clinic" className="h-full w-full object-contain" />
+              <img
+                src={logo}
+                alt="Pingol Ramos Dental Clinic"
+                className="h-full w-full object-contain"
+              />
             </span>
-            <p className="mt-3 font-display text-lg font-bold text-ink">Pingol Ramos Dental Clinic</p>
+            <p className="mt-3 font-display text-lg font-bold text-ink">
+              Pingol Ramos Dental Clinic
+            </p>
           </div>
 
-          {mode === 'login' ? (
+          {mode === "login" ? (
             <>
-              <h2 className="font-display text-2xl font-bold text-ink">Sign in</h2>
-              <p className="mt-1 text-sm text-muted">Welcome back. Please enter your details.</p>
+              <h2 className="font-display text-2xl font-bold text-ink">
+                Sign in
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                Welcome back. Please enter your details.
+              </p>
 
               <form onSubmit={submitLogin} className="mt-8 space-y-4">
                 <Field label="Email address" htmlFor="email">
                   <div className="relative">
-                    <Mail size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                    <Mail
+                      size={17}
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+                    />
                     <Input
                       id="email"
                       type="email"
@@ -139,10 +174,13 @@ export default function Login() {
 
                 <Field label="Password" htmlFor="password">
                   <div className="relative">
-                    <Lock size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                    <Lock
+                      size={17}
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+                    />
                     <Input
                       id="password"
-                      type={showPw ? 'text' : 'password'}
+                      type={showPw ? "text" : "password"}
                       autoComplete="current-password"
                       placeholder="••••••••"
                       className="px-10"
@@ -153,7 +191,7 @@ export default function Login() {
                       type="button"
                       onClick={() => setShowPw((s) => !s)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted transition hover:text-ink"
-                      aria-label={showPw ? 'Hide password' : 'Show password'}
+                      aria-label={showPw ? "Hide password" : "Show password"}
                     >
                       {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
                     </button>
@@ -172,7 +210,10 @@ export default function Login() {
                   </label>
                   <button
                     type="button"
-                    onClick={() => { setMode('forgot'); setError(''); }}
+                    onClick={() => {
+                      setMode("forgot");
+                      setError("");
+                    }}
                     className="text-sm font-medium text-navy-600 transition hover:text-navy-700"
                   >
                     Forgot password?
@@ -180,19 +221,29 @@ export default function Login() {
                 </div>
 
                 {error && (
-                  <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+                  <div
+                    className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+                    role="alert"
+                  >
                     {error}
                   </div>
                 )}
 
-                <Button type="submit" className="w-full" size="lg" loading={busy}>
+                <Button
+                  type="submit"
+                  className="w-full"
+                  size="lg"
+                  loading={busy}
+                >
                   <LogIn size={18} /> Sign in
                 </Button>
               </form>
 
               <div className="mt-6 rounded-xl border border-line bg-white/60 p-4 text-xs text-muted">
                 <p className="font-semibold text-ink">Demo credentials</p>
-                <p className="mt-1">Admin · admin@pingolramos.com / Admin@123</p>
+                <p className="mt-1">
+                  Admin · admin@pingolramos.com / Admin@123
+                </p>
                 <p>Dentist · dentist@pingolramos.com / Dentist@123</p>
                 <p>Staff · staff@pingolramos.com / Staff@123</p>
               </div>
@@ -201,12 +252,17 @@ export default function Login() {
             <>
               <button
                 type="button"
-                onClick={() => { setMode('login'); setError(''); }}
+                onClick={() => {
+                  setMode("login");
+                  setError("");
+                }}
                 className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-muted transition hover:text-ink"
               >
                 <ArrowLeft size={16} /> Back to sign in
               </button>
-              <h2 className="font-display text-2xl font-bold text-ink">Reset password</h2>
+              <h2 className="font-display text-2xl font-bold text-ink">
+                Reset password
+              </h2>
               <p className="mt-1 text-sm text-muted">
                 Enter your account email and we'll generate a reset link.
               </p>
@@ -214,7 +270,10 @@ export default function Login() {
               <form onSubmit={submitForgot} className="mt-8 space-y-4">
                 <Field label="Email address" htmlFor="femail">
                   <div className="relative">
-                    <Mail size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                    <Mail
+                      size={17}
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+                    />
                     <Input
                       id="femail"
                       type="email"
@@ -228,13 +287,21 @@ export default function Login() {
                 </Field>
 
                 {error && (
-                  <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+                  <div
+                    className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+                    role="alert"
+                  >
                     {error}
                   </div>
                 )}
 
-                <Button type="submit" className="w-full" size="lg" loading={busy}>
-                  {busy ? <Spinner size={18} /> : 'Send reset link'}
+                <Button
+                  type="submit"
+                  className="w-full"
+                  size="lg"
+                  loading={busy}
+                >
+                  {busy ? <Spinner size={18} /> : "Send reset link"}
                 </Button>
               </form>
             </>
@@ -247,6 +314,6 @@ export default function Login() {
 
 const heroPattern = {
   backgroundImage:
-    'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.4) 1px, transparent 0)',
-  backgroundSize: '28px 28px',
+    "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.4) 1px, transparent 0)",
+  backgroundSize: "28px 28px",
 };
