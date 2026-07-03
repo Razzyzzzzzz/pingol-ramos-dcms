@@ -13,7 +13,7 @@ import {
 import { Modal, ConfirmDialog } from '../components/ui/Modal.jsx';
 import { formatDate, titleCase } from '../lib/format';
 
-const ROLE_TONE = { admin: 'navy', dentist: 'blue', staff: 'gray' };
+const ROLE_TONE = { admin: 'navy', dentist: 'blue', staff: 'gray', patient: 'green' };
 
 export default function Settings() {
   const { isAdmin } = useAuth();
@@ -172,7 +172,7 @@ function PasswordSettings() {
 }
 
 /* ---- User management (admin) ---------------------------------------------- */
-const ROLES = ['admin', 'dentist', 'staff'];
+const ROLES = ['admin', 'dentist', 'staff', 'patient'];
 
 function UserManagement() {
   const toast = useToast();

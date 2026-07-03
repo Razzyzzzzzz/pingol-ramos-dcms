@@ -7,6 +7,8 @@ import api, { unwrap } from '../lib/api';
 export const authApi = {
   login: (email, password) =>
     unwrap(api.post('/auth.php?action=login', { email, password })),
+  registerPatient: (data) =>
+    unwrap(api.post('/auth.php?action=register-patient', data)),
   me: () => unwrap(api.get('/auth.php?action=me')),
   changePassword: (current, next) =>
     unwrap(api.post('/auth.php?action=change-password', { current, new: next })),
@@ -14,6 +16,33 @@ export const authApi = {
     unwrap(api.post('/auth.php?action=forgot-password', { email })),
   resetPassword: (token, password) =>
     unwrap(api.post('/auth.php?action=reset-password', { token, password })),
+};
+
+// ---- Public landing / booking ----------------------------------------------
+export const publicAppointmentsApi = {
+  services: () => unwrap(api.get('/public_appointments.php?view=services')),
+  create: (data) => unwrap(api.post('/public_appointments.php', data)),
+  availability: (date, serviceId) =>
+    unwrap(
+      api.get('/schedules.php', {
+        params: { view: 'availability', date, service_id: serviceId || undefined },
+      })
+    ),
+};
+
+// ---- Doctor schedules (admin) ------------------------------------------------
+export const schedulesApi = {
+  list: (dentistId) =>
+    unwrap(api.get('/schedules.php', { params: dentistId ? { dentist_id: dentistId } : {} })),
+  create: (data) => unwrap(api.post('/schedules.php', data)),
+  update: (id, data) => unwrap(api.put(`/schedules.php?id=${id}`, data)),
+  remove: (id) => unwrap(api.delete(`/schedules.php?id=${id}`)),
+};
+
+// ---- Patient portal -----------------------------------------------------------
+export const patientPortalApi = {
+  appointments: () => unwrap(api.get('/patient_portal.php?view=appointments')),
+  payments: () => unwrap(api.get('/patient_portal.php?view=payments')),
 };
 
 // ---- Dashboard --------------------------------------------------------------

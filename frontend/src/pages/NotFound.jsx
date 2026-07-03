@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Home, Compass } from 'lucide-react';
+import { Home } from 'lucide-react';
 import { Button } from '../components/ui/index.jsx';
 import logo from '../assets/logo.png';
 
@@ -16,7 +16,7 @@ export default function NotFound() {
           The page you're looking for doesn't exist or may have been moved.
         </p>
         <div className="mt-6 flex items-center justify-center gap-3">
-          <Link to="/"><Button><Home size={18} /> Back to dashboard</Button></Link>
+          <Link to="/"><Button><Home size={18} /> Back home</Button></Link>
         </div>
       </div>
     </div>
